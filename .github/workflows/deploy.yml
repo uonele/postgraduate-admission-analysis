@@ -26,4 +26,20 @@ jobs:
           restore-keys: |
             mkdocs-material-
       - run: pip install mkdocs-material 
-      - run: mkdocs gh-deploy --force
+      - name: Build CI config and deploy
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import yaml
+
+          config_path = Path("mkdocs.yml")
+          config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+          config["docs_dir"] = os.environ["GITHUB_WORKSPACE"]
+          config["site_dir"] = str(Path(os.environ["RUNNER_TEMP"]) / "mkdocs-site")
+          Path("mkdocs.ci.yml").write_text(
+              yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+              encoding="utf-8",
+          )
+          PY
+          mkdocs gh-deploy --force -f mkdocs.ci.yml
