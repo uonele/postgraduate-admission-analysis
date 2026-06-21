@@ -44,13 +44,16 @@ jobs:
             shutil.rmtree(docs_dir)
 
           for source in workspace.rglob("*.md"):
-            if ".git/" in source.as_posix():
+            if ".git" in source.relative_to(workspace).parts:
               continue
             target = docs_dir / source.relative_to(workspace)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
 
-          config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+          try:
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+          except Exception as exc:
+            raise SystemExit(f"Failed to load mkdocs.yml: {exc}") from exc
           config["docs_dir"] = str(docs_dir)
           config["site_dir"] = str(site_dir)
           ci_config_path.write_text(
