@@ -25,5 +25,40 @@ jobs:
           path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install mkdocs-material 
-      - run: mkdocs gh-deploy --force
+      - run: pip install mkdocs-material pyyaml
+      - name: Build CI config and deploy
+        run: |
+          python - <<'PY'
+          import os
+          import shutil
+          from pathlib import Path
+          import yaml
+
+          workspace = Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+          docs_dir = Path(os.environ["RUNNER_TEMP"]) / "mkdocs-docs"
+          site_dir = Path(os.environ["RUNNER_TEMP"]) / "mkdocs-site"
+          config_path = workspace / "mkdocs.yml"
+          ci_config_path = Path(os.environ["RUNNER_TEMP"]) / "mkdocs.ci.yml"
+
+          if docs_dir.exists():
+            shutil.rmtree(docs_dir)
+
+          for source in workspace.rglob("*.md"):
+            if ".git" in source.relative_to(workspace).parts:
+              continue
+            target = docs_dir / source.relative_to(workspace)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+          try:
+            config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+          except Exception as exc:
+            raise SystemExit(f"Failed to load mkdocs.yml: {exc}") from exc
+          config["docs_dir"] = str(docs_dir)
+          config["site_dir"] = str(site_dir)
+          ci_config_path.write_text(
+              yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+              encoding="utf-8",
+          )
+          PY
+          mkdocs gh-deploy --force -f "$RUNNER_TEMP/mkdocs.ci.yml"
