@@ -39,12 +39,16 @@ jobs:
           site_dir = Path(os.environ["RUNNER_TEMP"]) / "mkdocs-site"
           config_path = workspace / "mkdocs.yml"
           ci_config_path = Path(os.environ["RUNNER_TEMP"]) / "mkdocs.ci.yml"
+          excluded_dirs = {".git", "node_modules", "venv", ".venv", ".pytest_cache", "__pycache__"}
 
           if docs_dir.exists():
-            shutil.rmtree(docs_dir)
+            try:
+              shutil.rmtree(docs_dir)
+            except OSError as exc:
+              raise SystemExit(f"Failed to clean temporary docs directory: {exc}") from exc
 
           for source in workspace.rglob("*.md"):
-            if ".git" in source.relative_to(workspace).parts:
+            if any(part in excluded_dirs for part in source.relative_to(workspace).parts):
               continue
             target = docs_dir / source.relative_to(workspace)
             target.parent.mkdir(parents=True, exist_ok=True)
